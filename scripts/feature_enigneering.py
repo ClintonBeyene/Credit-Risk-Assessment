@@ -56,8 +56,7 @@ def encode_AG(df, group, main_columns, aggregations):
     for main_column in main_columns:
         for agg_type in aggregations:
             new_col_name = group + '_' + main_column + '_' + agg_type
-            temp_df = df.groupby(group)[main_column].agg([agg_type]).reset_index().rename(columns={agg_type: new_col_name})
-            df = df.merge(temp_df, on=group, how='left')
+            df[new_col_name] = df.groupby(group)[main_column].transform(agg_type)
             df[new_col_name] = df[new_col_name].astype('float32')
             print(new_col_name, ', ', end='')
 
