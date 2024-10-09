@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import scorecardpy as sc
+
 
 def numerical_distribution(df, numerical_columns, style='whitegrid', nrows=4, ncols=3, figsize=(15,5), bins=30):
     # Set the style
@@ -60,5 +62,15 @@ def outlier_detection(df, numeric_columns, style='whitegrid', nrows=4, ncols=3, 
         fig.delaxes(axes[j])
 
     # Adjust layout and show plot 
+    plt.tight_layout()
+    plt.show()
+
+def plot_woe_binning(bins, feature):
+    """
+    Plot WoE binning results for a specific feature.
+    """
+    plt.figure(figsize=(10, 6))
+    sc.woebin_plot(bins[feature])
+    plt.title(f'WoE Binning Plot for {feature}')
     plt.tight_layout()
     plt.show()
