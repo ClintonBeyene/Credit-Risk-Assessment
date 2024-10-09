@@ -8,9 +8,7 @@ def extract_features(df, cols, features=None):
                 'Is_month_end', 'Is_month_start', 'Is_quarter_end', 'Is_quarter_start', 'Is_year_end', 'Is_year_start',
                 'Hour', 'Minute', 'Second']
     
-    for col in cols:
-        df[col] = pd.to_datetime(df[col], format='%Y-%m-%dT%H:%M:%SZ')
-        
+    for col in cols:        
         for feature in features:
             if feature == 'Week':
                 df[col + '_' + feature] = df[col].dt.isocalendar().week
@@ -35,6 +33,37 @@ def extract_features(df, cols, features=None):
         
         df[col + '_Elapsed'] = df[col].astype(np.int64) // 10 ** 9
 
+
+def aggregate_data(group_columns, value_columns, agg_functions, df, fillna=True, use_na=False):
+    """
+    Aggregate data by group_columns.
+
+    Parameters:
+        group_columns (list): List of column names to group by.
+        value_columns (list): List of column names to aggregate.
+        agg_functions (list): List of aggregation functions to apply.
+        df (pd.DataFrame): Input DataFrame.
+        fillna (bool, optional): Whether to fill missing values. Defaults to True.
+        use_na (bool, optional): Whether to use NaN for missing values. Defaults False.
+
+    Returns:
+        pd.DataFrame: The input DataFrame with aggregated columns.
+    """
+    for value_column in value_columns:
+        for agg_function in agg_functions:
+            aggregated_column_name = '_'.join(group_columns + [value_column, agg_function])
+            df[aggregated_column_name] = df.groupby(group_columns)[value_column].transform(agg_function)
+
+            if use_na:
+                df.loc[df[aggregated_column_name] == -1, aggregated_column_name] = np.nan
+
+            if fillna:
+                df[aggregated_column_name] = df[aggregated_column_name].fillna(-1)
+
+            print(f"'{aggregated_column_name}'", ', ', end='')
+
+    return df
+
 # Frequency Encoding
 def encode_FE(df, cols):
     for col in cols:
@@ -57,7 +86,10 @@ def encode_AG(df, group, main_columns, aggregations):
         for agg_type in aggregations:
             new_col_name = group + '_' + main_column + '_' + agg_type
             agg_values = df.groupby(group)[main_column].agg(agg_type)
-            df[new_col_name] = df[group].map(agg_values)
+            if agg_values.isnull().all():  # Check if all values are NaN
+                df[new_col_name] = 0  # If all NaN, fill with 0
+            else:
+                df[new_col_name] = df[group].map(agg_values).fillna(0)
             df[new_col_name] = df[new_col_name].astype('float32')
             print(new_col_name, ', ', end='')
 
@@ -74,3 +106,5 @@ def encode_AG2(df, group, main_columns):
         df[new_col_name] = df.groupby(group)[main_column].nunique().to_dict()
         df[new_col_name] = df[group].map(df[new_col_name]).astype('float32')
         print(new_col_name, ', ', end='')
+
+
