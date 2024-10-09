@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import scorecardpy as sc
+
 
 # Define the function
 def extract_features(df, cols, features=None):
@@ -108,3 +110,67 @@ def encode_AG2(df, group, main_columns):
         print(new_col_name, ', ', end='')
 
 
+def rfms_score(df):
+    """
+    Calculate RFMS score for each customer.
+    RFMS: Recency, Frequency, Monetary, Size
+    """
+    # Assuming TransactionStartTime is already in datetime format
+    current_date = df['TransactionStartTime'].max()
+    
+    customer_metrics = df.groupby('CustomerId').agg({
+        'TransactionStartTime': lambda x: (current_date - x.max()).days,  # Recency
+        'TransactionId': 'count',  # Frequency
+        'Amount': ['sum', 'mean'],  # Monetary and Size
+    })
+    
+    customer_metrics.columns = ['Recency', 'Frequency', 'MonetaryTotal', 'MonetaryAvg']
+    
+    # Normalize the metrics
+    for col in customer_metrics.columns:
+        customer_metrics[f'{col}_Normalized'] = (customer_metrics[col] - customer_metrics[col].min()) / (customer_metrics[col].max() - customer_metrics[col].min())
+    
+    # Calculate RFMS score (you may adjust the weights as needed)
+    customer_metrics['RFMS_Score'] = (
+        0.25 * (1 - customer_metrics['Recency_Normalized']) +  # Inverse of Recency
+        0.25 * customer_metrics['Frequency_Normalized'] +
+        0.25 * customer_metrics['MonetaryTotal_Normalized'] +
+        0.25 * customer_metrics['MonetaryAvg_Normalized']
+    )
+    
+    return customer_metrics
+
+def assign_good_bad_label(df, rfms_scores, threshold=0.4):
+    """
+    Assign good/bad labels based on RFMS score per customer
+    """
+    # Merge RFMS scores with the original dataframe
+    customer_labels = rfms_scores['RFMS_Score'].reset_index()
+    customer_labels['label'] = np.where(customer_labels['RFMS_Score'] > threshold, 'good', 'bad')
+    
+    # Merge labels back to the original dataframe
+    df = df.merge(customer_labels[['CustomerId', 'RFMS_Score', 'label']], on='CustomerId', how='left')
+    
+    return df
+
+
+def woe_binning(df, target_col, features):
+    """
+    Perform Weight of Evidence (WoE) binning on specified features.
+    
+    :param df: DataFrame containing the features and target variable
+    :param target_col: Name of the target column
+    :param features: List of feature names to perform WoE binning on
+    :return: DataFrame with WoE binned features
+    """
+    bins = sc.woebin(df, y=target_col, x=features)
+    woe_df = sc.woebin_ply(df, bins)
+
+    # Extract and print IV for each feature
+    iv_values = {}
+    for feature in features:
+        iv_values[feature] = bins[feature]['total_iv'].values[0]
+        print(f"IV for {feature}: {iv_values[feature]}")
+
+
+    return woe_df, iv_values
