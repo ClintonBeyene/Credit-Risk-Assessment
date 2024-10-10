@@ -1,34 +1,68 @@
-from flask import Flask, request, jsonify
-import pickle
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Oct 10 15:26:41 2024
+
+@author: clinton
+"""
+
+# 1. Library imports
+import uvicorn
+from fastapi import FastAPI
+from CreditScoring import CreditScoring
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+import pickle
+import pandas as pd
 
-app = Flask(__name__)
+# 2. Create the app object
+app = FastAPI()
+pickle_in = open("model.pkl","rb")
+classifier=pickle.load(pickle_in)
 
-# Load the trained model
-with open('model.pkl', 'rb') as f:
-    model = pickle.load(f)
+# 3. Index route, opens automatically on http://127.0.0.1:8000
+@app.get('/')
+def index():
+    return {'message': 'Hello, World'}
 
-# Define API endpoint to make predictions
-@app.route('/predict', methods=['POST'])
-def predict():
-    # Receive input data
-    data = request.get_json()
-    features = np.array(data['features'])
+# 4. Route with a single parameter, returns the parameter within a message
+#    Located at: http://127.0.0.1:8000/AnyNameHere
+@app.get('/{name}')
+def get_name(name: str):
+    return {'Welcome To Credit Scoring Model': f'{name}'}
 
-    # Preprocess input data (if necessary)
-    #...
+# 3. Expose the prediction functionality, make a prediction from the passed
+#    JSON data and return the predicted Credit Score with the confidence
+@app.post('/predict')
+def predict_credit_scoring(data:CreditScoring):
+    data = data.dict()
+    TransactionStartTime_Day=data['TransactionStartTime_Day']
+    TransactionCount=data['TransactionCount']
+    StdTransactionAmount=data['StdTransactionAmount']
+    TransactionStartTime_Month=data['TransactionStartTime_Month']
+    AverageTransactionAmount=data['AverageTransactionAmount']
+    Value=data['Value']
+    TransactionStartTime_Hour=data['TransactionStartTime_Hour']
+    FraudResult=data['FraudResult']
+    Amount=data['Amount']
+    PricingStrategy=data['PricingStrategy']
+    MonetaryTotal_woe=data['MonetaryTotal_woe']
+    MonetaryAvg_woe=data['MonetaryAvg_woe']
+    Frequency_woe=data['Frequency_woe']
+    Recency_woe=data['Recency_woe']
+    
+    prediction = classifier.predict(np.array([[TransactionStartTime_Day, TransactionCount, StdTransactionAmount, TransactionStartTime_Month, 
+                                             AverageTransactionAmount, Value, TransactionStartTime_Hour, FraudResult, Amount, 
+                                             PricingStrategy, MonetaryTotal_woe, MonetaryAvg_woe, Frequency_woe, Recency_woe]]))
+    if(prediction[0]==0):
+        prediction="Bad"
+    else:
+        prediction="Good"
+    return {
+        'prediction': prediction
+    }
 
-    # Make predictions using the loaded model
-    prediction = model.predict(features)
-
-    # Format the prediction
-    response = {'prediction': prediction.tolist()}
-
-    # Return the prediction as a response to the API call
-    return jsonify(response)
-
+# 5. Run the API with uvicorn
+#    Will run on http://127.0.0.1:8000
 if __name__ == '__main__':
-    app.run(debug=True)
+    uvicorn.run(app, host='127.0.0.1', port=8000)
+    
+#uvicorn app:app --reload # First parameter is app file second parameter is object
