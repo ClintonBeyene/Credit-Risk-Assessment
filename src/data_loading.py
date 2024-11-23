@@ -32,19 +32,3 @@ def load_data(file_path):
     data = pd.read_csv(file_path)
     return data
 
-
-def split_data(data, test_size=0.2, random_state=42):
-    """
-    Split data into training and testing sets.
-
-    Parameters:
-    data(pd.DataFrame): The data to split.
-    test_size (float): The proportion of the data to include in the test split.
-    random_state (int): The seed used by random number generator.
-
-    Returns:
-    pd.DataFrame, pd.DataFrame: The training and testing Data. 
-    """
-
-    train_data, test_data = train_test_split(data, test_size=test_size, random_state=random_state)
-    return train_data, test_data
